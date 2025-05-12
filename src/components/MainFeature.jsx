@@ -15,6 +15,7 @@ function MainFeature() {
   const MousePointerIcon = getIcon('MousePointer');
   const KeyboardIcon = getIcon('Keyboard');
   const FileIcon = getIcon('File');
+  const GlobeIcon = getIcon('Globe');
 
   // State management
   const [isRecording, setIsRecording] = useState(false);
@@ -31,6 +32,9 @@ function MainFeature() {
   const [nameError, setNameError] = useState('');
   const timerRef = useRef(null);
   const [expandedTest, setExpandedTest] = useState(null);
+  const [showUrlModal, setShowUrlModal] = useState(false);
+  const [url, setUrl] = useState('');
+  const [urlError, setUrlError] = useState('');
 
   // Handle recording timer
   useEffect(() => {
@@ -52,22 +56,51 @@ function MainFeature() {
     return `${minutes}:${seconds}`;
   };
 
-  // Toggle recording status
+  // Show URL modal when starting recording
   const toggleRecording = () => {
     if (!isRecording) {
-      // Start recording
+      // Show URL modal first
       if (!recordingName.trim()) {
         setNameError('Please enter a name for your recording');
         return;
       }
       setNameError('');
-      setIsRecording(true);
-      setIsPaused(false);
-      toast.success('Recording started', { icon: '🎥' });
+      setShowUrlModal(true);
     } else {
       // Stop recording
       handleStopRecording();
     }
+  };
+
+  // Validate URL format
+  const isValidUrl = (string) => {
+    try {
+      const url = new URL(string);
+      return url.protocol === "http:" || url.protocol === "https:";
+    } catch (_) {
+      return false;
+    }
+  };
+
+  // Start recording after URL is provided
+  const startRecording = () => {
+    // Validate recording name again
+    if (!recordingName.trim()) {
+      setNameError('Please enter a name for your recording');
+      return;
+    }
+    
+    // Validate URL
+    if (!url.trim() || !isValidUrl(url)) {
+      setUrlError('Please enter a valid URL (e.g., https://example.com)');
+      return;
+    }
+    
+    // Start recording with validated inputs
+    setShowUrlModal(false);
+    setIsRecording(true);
+    setIsPaused(false);
+    toast.success(`Recording started on ${url}`, { icon: '🎥' });
   };
 
   // Toggle pause status
@@ -398,6 +431,71 @@ function MainFeature() {
           </AnimatePresence>
         </div>
       </motion.div>
+      
+      {/* URL Input Modal */}
+      {showUrlModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <motion.div 
+            className="bg-white dark:bg-surface-800 rounded-xl p-6 w-full max-w-md mx-4 shadow-xl"
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold flex items-center">
+                <GlobeIcon className="mr-2 h-5 w-5 text-primary" />
+                Enter URL to Record
+              </h3>
+              <button 
+                onClick={() => setShowUrlModal(false)}
+                className="text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-200"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                Website URL
+              </label>
+              <input
+                type="url"
+                value={url}
+                onChange={(e) => {
+                  setUrl(e.target.value);
+                  if (e.target.value.trim()) setUrlError('');
+                }}
+                placeholder="https://example.com"
+                className={`input-field ${urlError ? 'border-red-500 dark:border-red-400' : ''}`}
+                autoFocus
+              />
+              {urlError && <p className="mt-1 text-sm text-red-500">{urlError}</p>}
+              <p className="mt-2 text-sm text-surface-500 dark:text-surface-400">
+                Enter the URL of the website you want to test
+              </p>
+            </div>
+            
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowUrlModal(false)}
+                className="btn bg-surface-200 dark:bg-surface-700 text-surface-800 dark:text-surface-100 hover:bg-surface-300 dark:hover:bg-surface-600"
+              >
+                Cancel
+              </button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={startRecording}
+                className="btn btn-primary"
+              >
+                Start Recording
+              </motion.button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
