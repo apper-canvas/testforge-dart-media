@@ -1,0 +1,432 @@
+import { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'react-toastify';
+import getIcon from '../utils/iconUtils';
+
+function MainFeature() {
+  // Icon Components
+  const PlayIcon = getIcon('Play');
+  const StopIcon = getIcon('Square');
+  const PauseIcon = getIcon('Pause');
+  const SaveIcon = getIcon('Save');
+  const EditIcon = getIcon('Edit2');
+  const TrashIcon = getIcon('Trash2');
+  const MonitorIcon = getIcon('Monitor');
+  const MousePointerIcon = getIcon('MousePointer');
+  const KeyboardIcon = getIcon('Keyboard');
+  const FileIcon = getIcon('File');
+
+  // State management
+  const [isRecording, setIsRecording] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [recordingName, setRecordingName] = useState('');
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [recordingSettings, setRecordingSettings] = useState({
+    captureScreen: true,
+    captureMouse: true,
+    captureKeyboard: true
+  });
+  const [generatedTests, setGeneratedTests] = useState([]);
+  const [isGeneratingTests, setIsGeneratingTests] = useState(false);
+  const [nameError, setNameError] = useState('');
+  const timerRef = useRef(null);
+  const [expandedTest, setExpandedTest] = useState(null);
+
+  // Handle recording timer
+  useEffect(() => {
+    if (isRecording && !isPaused) {
+      timerRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } else {
+      clearInterval(timerRef.current);
+    }
+
+    return () => clearInterval(timerRef.current);
+  }, [isRecording, isPaused]);
+
+  // Format the timer display
+  const formatTime = (time) => {
+    const minutes = Math.floor(time / 60).toString().padStart(2, '0');
+    const seconds = (time % 60).toString().padStart(2, '0');
+    return `${minutes}:${seconds}`;
+  };
+
+  // Toggle recording status
+  const toggleRecording = () => {
+    if (!isRecording) {
+      // Start recording
+      if (!recordingName.trim()) {
+        setNameError('Please enter a name for your recording');
+        return;
+      }
+      setNameError('');
+      setIsRecording(true);
+      setIsPaused(false);
+      toast.success('Recording started', { icon: '🎥' });
+    } else {
+      // Stop recording
+      handleStopRecording();
+    }
+  };
+
+  // Toggle pause status
+  const togglePause = () => {
+    setIsPaused(!isPaused);
+    toast.info(isPaused ? 'Recording resumed' : 'Recording paused', { 
+      autoClose: 2000
+    });
+  };
+
+  // Handle stop recording and test generation
+  const handleStopRecording = () => {
+    setIsRecording(false);
+    setIsPaused(false);
+    
+    // Generate test cases from recording
+    setIsGeneratingTests(true);
+    
+    // Simulate API call delay
+    setTimeout(() => {
+      const newTests = generateMockTests();
+      setGeneratedTests(prev => [...newTests, ...prev]);
+      setIsGeneratingTests(false);
+      setRecordingTime(0);
+      
+      toast.success('Test cases generated successfully!', {
+        icon: '✅'
+      });
+    }, 2000);
+  };
+
+  // Generate mock test data
+  const generateMockTests = () => {
+    const actionTypes = ['click', 'type', 'navigate', 'submit', 'select', 'verify'];
+    const selectors = ['button', 'input', 'form', 'dropdown', 'checkbox', 'link', 'element'];
+    
+    const steps = Array.from({ length: Math.floor(Math.random() * 5) + 3 }, (_, i) => {
+      const action = actionTypes[Math.floor(Math.random() * actionTypes.length)];
+      const selector = selectors[Math.floor(Math.random() * selectors.length)];
+      
+      return {
+        id: `step-${Date.now()}-${i}`,
+        sequence: i + 1,
+        action,
+        element: {
+          type: selector,
+          selector: `#${selector}-${Math.floor(Math.random() * 100)}`,
+        },
+        description: `${action.charAt(0).toUpperCase() + action.slice(1)} on ${selector}`
+      };
+    });
+    
+    return [{
+      id: `test-${Date.now()}`,
+      name: recordingName,
+      dateCreated: new Date().toISOString(),
+      duration: recordingTime,
+      steps,
+      status: 'new'
+    }];
+  };
+
+  // Toggle a test case expansion
+  const toggleTestExpansion = (testId) => {
+    setExpandedTest(expandedTest === testId ? null : testId);
+  };
+
+  // Toggle recording settings
+  const toggleSetting = (setting) => {
+    setRecordingSettings(prev => ({
+      ...prev,
+      [setting]: !prev[setting]
+    }));
+  };
+
+  // Delete a test case
+  const deleteTest = (testId, e) => {
+    e.stopPropagation();
+    setGeneratedTests(prev => prev.filter(test => test.id !== testId));
+    toast.info('Test case deleted', { 
+      icon: '🗑️',
+      autoClose: 2000
+    });
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Recording Panel */}
+      <motion.div 
+        className="neu-card"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+      >
+        <h2 className="text-2xl font-bold mb-4 flex items-center">
+          <MonitorIcon className="mr-2 h-6 w-6 text-primary" />
+          Screen Recorder
+        </h2>
+        
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+            Recording Name
+          </label>
+          <input
+            type="text"
+            value={recordingName}
+            onChange={(e) => {
+              setRecordingName(e.target.value);
+              if (e.target.value.trim()) setNameError('');
+            }}
+            placeholder="Enter a name for your recording"
+            className={`input-field ${nameError ? 'border-red-500 dark:border-red-400' : ''}`}
+            disabled={isRecording}
+          />
+          {nameError && <p className="mt-1 text-sm text-red-500">{nameError}</p>}
+        </div>
+        
+        <div className="mb-6">
+          <h3 className="text-lg font-medium mb-3">Capture Settings</h3>
+          <div className="space-y-3">
+            <SettingToggle
+              label="Screen Capture"
+              icon={<MonitorIcon className="h-5 w-5" />}
+              enabled={recordingSettings.captureScreen}
+              onChange={() => toggleSetting('captureScreen')}
+              disabled={isRecording}
+            />
+            <SettingToggle
+              label="Mouse Actions"
+              icon={<MousePointerIcon className="h-5 w-5" />}
+              enabled={recordingSettings.captureMouse}
+              onChange={() => toggleSetting('captureMouse')}
+              disabled={isRecording}
+            />
+            <SettingToggle
+              label="Keyboard Events"
+              icon={<KeyboardIcon className="h-5 w-5" />}
+              enabled={recordingSettings.captureKeyboard}
+              onChange={() => toggleSetting('captureKeyboard')}
+              disabled={isRecording}
+            />
+          </div>
+        </div>
+        
+        <div className="flex flex-col items-center mb-4">
+          <div className="text-4xl font-mono font-bold mb-4 bg-surface-100 dark:bg-surface-700 px-6 py-3 rounded-xl">
+            {formatTime(recordingTime)}
+          </div>
+          
+          <div className="flex gap-4">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={toggleRecording}
+              className={`btn ${isRecording ? 'bg-red-500 hover:bg-red-600' : 'btn-primary'} flex items-center`}
+              disabled={isGeneratingTests}
+            >
+              {isRecording ? (
+                <>
+                  <StopIcon className="w-5 h-5 mr-2" />
+                  Stop
+                </>
+              ) : (
+                <>
+                  <PlayIcon className="w-5 h-5 mr-2" />
+                  Start Recording
+                </>
+              )}
+            </motion.button>
+            
+            {isRecording && (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={togglePause}
+                className="btn bg-yellow-500 hover:bg-yellow-600 text-white flex items-center"
+              >
+                {isPaused ? (
+                  <>
+                    <PlayIcon className="w-5 h-5 mr-2" />
+                    Resume
+                  </>
+                ) : (
+                  <>
+                    <PauseIcon className="w-5 h-5 mr-2" />
+                    Pause
+                  </>
+                )}
+              </motion.button>
+            )}
+          </div>
+        </div>
+        
+        <div className="mt-4 border-t border-surface-200 dark:border-surface-700 pt-4">
+          <p className="text-sm text-surface-500 dark:text-surface-400">
+            {isRecording 
+              ? isPaused 
+                ? "Recording paused. Resume when ready." 
+                : "Recording in progress... Click Stop when finished."
+              : "Click 'Start Recording' to capture your screen and generate test cases."}
+          </p>
+        </div>
+      </motion.div>
+      
+      {/* Generated Test Cases Panel */}
+      <motion.div 
+        className="neu-card"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+      >
+        <h2 className="text-2xl font-bold mb-4 flex items-center">
+          <FileIcon className="mr-2 h-6 w-6 text-primary" />
+          Generated Test Cases
+        </h2>
+        
+        {isGeneratingTests && (
+          <div className="p-8 flex flex-col items-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mb-4"></div>
+            <p className="text-surface-600 dark:text-surface-300">Generating test cases from your recording...</p>
+          </div>
+        )}
+        
+        {!isGeneratingTests && generatedTests.length === 0 && (
+          <div className="p-8 text-center border-2 border-dashed border-surface-300 dark:border-surface-700 rounded-xl">
+            <p className="text-surface-600 dark:text-surface-300 mb-2">No test cases generated yet</p>
+            <p className="text-sm text-surface-500 dark:text-surface-400">
+              Record your first session to generate test cases automatically
+            </p>
+          </div>
+        )}
+        
+        <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 scrollbar-hide">
+          <AnimatePresence>
+            {generatedTests.map((test) => (
+              <motion.div
+                key={test.id}
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.3 }}
+                className="border border-surface-200 dark:border-surface-700 rounded-xl overflow-hidden"
+              >
+                <div 
+                  className={`p-4 cursor-pointer ${
+                    expandedTest === test.id 
+                      ? 'bg-primary bg-opacity-10 dark:bg-primary-dark dark:bg-opacity-20' 
+                      : 'bg-white dark:bg-surface-800 hover:bg-surface-50 dark:hover:bg-surface-700'
+                  }`}
+                  onClick={() => toggleTestExpansion(test.id)}
+                >
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center">
+                      <span className={`px-2 py-1 text-xs rounded-full mr-3 ${
+                        test.status === 'new' 
+                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' 
+                          : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                      }`}>
+                        {test.status === 'new' ? 'New' : 'Verified'}
+                      </span>
+                      <h3 className="font-medium">{test.name}</h3>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toast.info('Edit functionality coming soon!');
+                        }}
+                        className="p-2 text-surface-500 hover:text-primary dark:text-surface-400 dark:hover:text-primary-light"
+                      >
+                        <EditIcon className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={(e) => deleteTest(test.id, e)}
+                        className="p-2 text-surface-500 hover:text-red-500 dark:text-surface-400 dark:hover:text-red-400"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-2 text-xs text-surface-500 dark:text-surface-400 flex flex-wrap gap-x-4">
+                    <span>{new Date(test.dateCreated).toLocaleString()}</span>
+                    <span>{formatTime(test.duration)} duration</span>
+                    <span>{test.steps.length} steps</span>
+                  </div>
+                </div>
+                
+                {expandedTest === test.id && (
+                  <div className="border-t border-surface-200 dark:border-surface-700 p-4 bg-surface-50 dark:bg-surface-800">
+                    <h4 className="font-medium mb-3">Test Steps:</h4>
+                    <div className="space-y-2">
+                      {test.steps.map((step) => (
+                        <div 
+                          key={step.id} 
+                          className="p-3 bg-white dark:bg-surface-700 rounded-lg border border-surface-200 dark:border-surface-600 flex items-center"
+                        >
+                          <div className="flex-shrink-0 w-8 h-8 bg-primary bg-opacity-10 dark:bg-opacity-20 rounded-full flex items-center justify-center mr-3">
+                            <span className="text-primary dark:text-primary-light font-medium">
+                              {step.sequence}
+                            </span>
+                          </div>
+                          <div>
+                            <div className="font-medium">{step.description}</div>
+                            <div className="text-xs text-surface-500 dark:text-surface-400 mt-1">
+                              {step.element.selector}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="mt-4 flex justify-end">
+                      <button 
+                        className="btn btn-outline flex items-center text-sm"
+                        onClick={() => {
+                          toast.success('Test case saved!');
+                        }}
+                      >
+                        <SaveIcon className="w-4 h-4 mr-2" />
+                        Save Test Case
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+// Setting Toggle Component
+function SettingToggle({ label, icon, enabled, onChange, disabled }) {
+  return (
+    <div className={`flex items-center justify-between p-3 rounded-lg border ${
+      enabled 
+        ? 'border-primary bg-primary bg-opacity-5 dark:border-primary-light dark:bg-primary-dark dark:bg-opacity-10' 
+        : 'border-surface-200 dark:border-surface-700'
+    } ${disabled ? 'opacity-60' : 'cursor-pointer'}`}
+    onClick={disabled ? null : onChange}
+    >
+      <div className="flex items-center">
+        <div className={`mr-3 ${enabled ? 'text-primary dark:text-primary-light' : 'text-surface-500 dark:text-surface-400'}`}>
+          {icon}
+        </div>
+        <span className="font-medium">{label}</span>
+      </div>
+      <div className={`relative w-10 h-5 rounded-full transition-colors ${
+        enabled ? 'bg-primary dark:bg-primary-light' : 'bg-surface-300 dark:bg-surface-600'
+      }`}>
+        <div className={`absolute top-0.5 left-0.5 bg-white w-4 h-4 rounded-full shadow transform transition-transform ${
+          enabled ? 'translate-x-5' : ''
+        }`}></div>
+      </div>
+    </div>
+  );
+}
+
+export default MainFeature;
