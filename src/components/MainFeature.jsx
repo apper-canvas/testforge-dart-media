@@ -35,6 +35,7 @@ function MainFeature() {
   const [showUrlModal, setShowUrlModal] = useState(false);
   const [url, setUrl] = useState('');
   const [urlError, setUrlError] = useState('');
+  const [capturedEvents, setCapturedEvents] = useState([]);
 
   // Handle recording timer
   useEffect(() => {
@@ -48,6 +49,42 @@ function MainFeature() {
 
     return () => clearInterval(timerRef.current);
   }, [isRecording, isPaused]);
+
+  // Simulate event capture during recording
+  useEffect(() => {
+    let eventCaptureInterval = null;
+    
+    if (isRecording && !isPaused) {
+      // Clear any existing events when starting a new recording
+      if (recordingTime === 0) {
+        setCapturedEvents([]);
+      }
+      
+      // Start capturing events
+      eventCaptureInterval = setInterval(() => {
+        captureEvent();
+      }, 2000); // Capture a new event every 2 seconds for simulation
+    }
+    
+    return () => {
+      if (eventCaptureInterval) clearInterval(eventCaptureInterval);
+    };
+  }, [isRecording, isPaused, recordingTime]);
+  
+  // Function to simulate capturing an event
+  const captureEvent = () => {
+    const eventTypes = ['click', 'type', 'navigation', 'hover', 'focus', 'change', 'submit'];
+    const elements = ['button', 'input', 'link', 'dropdown', 'checkbox', 'form', 'image', 'text'];
+    
+    const newEvent = {
+      id: `event-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      type: eventTypes[Math.floor(Math.random() * eventTypes.length)],
+      element: elements[Math.floor(Math.random() * elements.length)],
+      details: `${elements[Math.floor(Math.random() * elements.length)]}-${Math.floor(Math.random() * 100)}`
+    };
+    setCapturedEvents(prev => [newEvent, ...prev]);
+  };
 
   // Format the timer display
   const formatTime = (time) => {
@@ -101,7 +138,9 @@ function MainFeature() {
     setIsRecording(true);
     setIsPaused(false);
     toast.success(`Recording started on ${url}`, { icon: '🎥' });
+    
     // Open the URL in a new tab
+    setCapturedEvents([]); // Clear previous events
     window.open(url, '_blank');
     
   };
@@ -126,6 +165,7 @@ function MainFeature() {
     setTimeout(() => {
       const newTests = generateMockTests();
       setGeneratedTests(prev => [...newTests, ...prev]);
+      setCapturedEvents([]); // Clear events after test generation
       setIsGeneratingTests(false);
       setRecordingTime(0);
       
@@ -251,6 +291,35 @@ function MainFeature() {
         <div className="flex flex-col items-center mb-4">
           <div className="text-4xl font-mono font-bold mb-4 bg-surface-100 dark:bg-surface-700 px-6 py-3 rounded-xl">
             {formatTime(recordingTime)}
+          </div>
+
+          {/* Event Capture Display */}
+          {isRecording && !isPaused && capturedEvents.length > 0 && (
+            <div className="w-full mb-4 border border-surface-200 dark:border-surface-700 rounded-xl overflow-hidden">
+              <div className="bg-surface-100 dark:bg-surface-700 py-2 px-4 border-b border-surface-200 dark:border-surface-700">
+                <h3 className="font-medium">Captured Events</h3>
+              </div>
+              <div className="max-h-48 overflow-y-auto p-2 bg-white dark:bg-surface-800">
+                <EventDisplay events={capturedEvents} />
+              </div>
+            </div>
+          )}
+          
+          {isRecording && !isPaused && capturedEvents.length === 0 && (
+            <div className="w-full mb-4 p-4 border border-dashed border-surface-300 dark:border-surface-700 rounded-xl text-center">
+              <p className="text-surface-600 dark:text-surface-400">
+                Waiting for events...
+              </p>
+            </div>
+          )}
+          
+          <div className="w-full text-sm text-surface-500 dark:text-surface-400 mb-4">
+            {isRecording && !isPaused && (
+              <div className="flex items-center justify-center space-x-2">
+                <span className="inline-block w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                <span>Recording user interactions on {url}</span>
+              </div>
+            )}
           </div>
           
           <div className="flex gap-4">
@@ -526,6 +595,62 @@ function SettingToggle({ label, icon, enabled, onChange, disabled }) {
           enabled ? 'translate-x-5' : ''
         }`}></div>
       </div>
+    </div>
+  );
+}
+
+// Event Display Component
+function EventDisplay({ events }) {
+  // Group events by type
+  const groupedEvents = events.reduce((acc, event) => {
+    if (!acc[event.type]) {
+      acc[event.type] = [];
+    }
+    acc[event.type].push(event);
+    return acc;
+  }, {});
+
+  // Get event icon based on event type
+  const getEventIcon = (type) => {
+    const icons = {
+      click: "MousePointer",
+      type: "Keyboard",
+      navigation: "Navigation",
+      hover: "Move",
+      focus: "Target",
+      change: "RefreshCw",
+      submit: "Send"
+    };
+    return getIcon(icons[type] || "Activity");
+  };
+
+  return (
+    <div className="space-y-2">
+      {Object.entries(groupedEvents).map(([type, typeEvents]) => (
+        <div key={type} className="mb-3">
+          <div className="flex items-center mb-1 text-xs font-medium text-surface-500 dark:text-surface-400">
+            {React.createElement(getEventIcon(type), { className: "h-3 w-3 mr-1" })}
+            <span className="uppercase">{type} Events</span>
+          </div>
+          
+          {typeEvents.map(event => (
+            <div 
+              key={event.id} 
+              className="px-3 py-2 bg-surface-50 dark:bg-surface-700 rounded border border-surface-200 dark:border-surface-600 text-sm mb-1 animate-fadeIn"
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-medium">{event.element}</span>
+                <span className="text-xs text-surface-500 dark:text-surface-400">
+                  {new Date(event.timestamp).toLocaleTimeString()}
+                </span>
+              </div>
+              <div className="text-xs text-surface-500 dark:text-surface-400 mt-1">
+                {event.details}
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
