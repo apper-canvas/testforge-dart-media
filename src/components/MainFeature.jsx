@@ -101,6 +101,9 @@ function MainFeature() {
     setIsRecording(true);
     setIsPaused(false);
     toast.success(`Recording started on ${url}`, { icon: '🎥' });
+    // Open the URL in a new tab
+    window.open(url, '_blank');
+    
   };
 
   // Toggle pause status
