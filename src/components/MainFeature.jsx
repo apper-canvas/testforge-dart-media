@@ -35,6 +35,8 @@ function MainFeature() {
   const [showUrlModal, setShowUrlModal] = useState(false);
   const [url, setUrl] = useState('');
   const [urlError, setUrlError] = useState('');
+  const [showDashboard, setShowDashboard] = useState(false);
+  const [recordingSteps, setRecordingSteps] = useState([]);
   const [capturedEvents, setCapturedEvents] = useState([]);
 
   // Handle recording timer
@@ -57,7 +59,7 @@ function MainFeature() {
     if (isRecording && !isPaused) {
       // Clear any existing events when starting a new recording
       if (recordingTime === 0) {
-        setCapturedEvents([]);
+        setCapturedEvents([]); setRecordingSteps([]);
       }
       
       // Start capturing events
@@ -83,7 +85,16 @@ function MainFeature() {
       element: elements[Math.floor(Math.random() * elements.length)],
       details: `${elements[Math.floor(Math.random() * elements.length)]}-${Math.floor(Math.random() * 100)}`
     };
+    
+    // Add to captured events and recording steps
     setCapturedEvents(prev => [newEvent, ...prev]);
+    
+    // Also add more detailed step information for the dashboard
+    setRecordingSteps(prev => [...prev, {
+      id: newEvent.id,
+      ...newEvent,
+      stepNumber: prev.length + 1
+    }]);
   };
 
   // Format the timer display
@@ -106,6 +117,7 @@ function MainFeature() {
     } else {
       // Stop recording
       handleStopRecording();
+      setShowDashboard(true);
     }
   };
 
@@ -143,6 +155,7 @@ function MainFeature() {
     setCapturedEvents([]); // Clear previous events
     window.open(url, '_blank');
     
+    setShowDashboard(false);
   };
 
   // Toggle pause status
@@ -163,7 +176,9 @@ function MainFeature() {
     
     // Simulate API call delay
     setTimeout(() => {
-      const newTests = generateMockTests();
+      // Generate mock tests using the recorded steps
+      const newTests = generateMockTests(recordingSteps);
+      
       setGeneratedTests(prev => [...newTests, ...prev]);
       setCapturedEvents([]); // Clear events after test generation
       setIsGeneratingTests(false);
@@ -176,7 +191,9 @@ function MainFeature() {
   };
 
   // Generate mock test data
-  const generateMockTests = () => {
+  const generateMockTests = (steps = []) => {
+    // If we have real steps, use them, otherwise generate random ones
+    if (steps.length > 0) {
     const actionTypes = ['click', 'type', 'navigate', 'submit', 'select', 'verify'];
     const selectors = ['button', 'input', 'form', 'dropdown', 'checkbox', 'link', 'element'];
     
@@ -195,7 +212,7 @@ function MainFeature() {
         description: `${action.charAt(0).toUpperCase() + action.slice(1)} on ${selector}`
       };
     });
-    
+
     return [{
       id: `test-${Date.now()}`,
       name: recordingName,
@@ -204,6 +221,31 @@ function MainFeature() {
       steps,
       status: 'new'
     }];
+    } else {
+      // Convert captured steps to test steps
+      const testSteps = recordingSteps.map((step, index) => ({
+        id: step.id,
+        sequence: index + 1,
+        action: step.type,
+        element: {
+          type: step.element,
+          selector: `#${step.element}-${step.details.split('-')[1] || '0'}`,
+        },
+        details: step.details,
+        timestamp: step.timestamp,
+        description: `${step.type.charAt(0).toUpperCase() + step.type.slice(1)} on ${step.element}`
+      }));
+      
+      // Create the test case
+    return [{
+      id: `test-${Date.now()}`,
+      name: recordingName,
+      dateCreated: new Date().toISOString(),
+      duration: recordingTime,
+      steps,
+      status: 'new'
+    }];
+    }
   };
 
   // Toggle a test case expansion
@@ -230,7 +272,7 @@ function MainFeature() {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className={`grid grid-cols-1 ${showDashboard ? "lg:grid-cols-1" : "lg:grid-cols-2"} gap-6`}>
       {/* Recording Panel */}
       <motion.div 
         className="neu-card"
@@ -376,6 +418,68 @@ function MainFeature() {
           </p>
         </div>
       </motion.div>
+      
+      {/* Recording Dashboard - Shows after recording is complete */}
+      {showDashboard && recordingSteps.length > 0 && (
+        <motion.div
+          className="neu-card"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold flex items-center">
+              <FileIcon className="mr-2 h-6 w-6 text-primary" />
+              Recording Dashboard
+            </h2>
+            <button
+              onClick={() => setShowDashboard(false)}
+              className="btn btn-outline text-sm"
+            >
+              Back to Recording
+            </button>
+          </div>
+          
+          <div className="mb-4 p-4 bg-surface-100 dark:bg-surface-700 rounded-xl">
+            <div className="flex flex-wrap gap-4 text-sm">
+              <div>
+                <span className="font-medium">Recording:</span> {recordingName}
+              </div>
+              <div>
+                <span className="font-medium">Target:</span> {url}
+              </div>
+              <div>
+                <span className="font-medium">Duration:</span> {formatTime(recordingTime)}
+              </div>
+              <div>
+                <span className="font-medium">Steps:</span> {recordingSteps.length}
+              </div>
+            </div>
+          </div>
+          
+          <div className="recording-steps-timeline mb-6">
+            <h3 className="text-lg font-medium mb-4">Recording Steps</h3>
+            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+              {recordingSteps.map((step, index) => (
+                <div key={step.id} className="step-item flex p-3 bg-white dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700 step-item-animation">
+                  <div className="step-number flex-shrink-0 w-10 h-10 bg-primary bg-opacity-10 dark:bg-opacity-20 rounded-full flex items-center justify-center mr-4">
+                    <span className="text-primary dark:text-primary-light font-medium">{index + 1}</span>
+                  </div>
+                  <div className="step-content flex-grow">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium">{step.type.charAt(0).toUpperCase() + step.type.slice(1)} Action</h4>
+                      <span className="text-xs text-surface-500 dark:text-surface-400">{new Date(step.timestamp).toLocaleTimeString()}</span>
+                    </div>
+                    <div className="mt-1">Element: <span className="font-medium">{step.element}</span></div>
+                    <div className="text-sm text-surface-500 dark:text-surface-400 mt-1">Details: {step.details}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+        </motion.div>
+      )}
       
       {/* Generated Test Cases Panel */}
       <motion.div 
